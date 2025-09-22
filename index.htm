@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard de GEE — CO₂e Emitido & Evitado</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#111823; --soft:#162132; --text:#e6edf3; --muted:#9fb0c3; --accent:#4cc9f0; --good:#2ecc71; --bad:#e74c3c; --warn:#f1c40f;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:var(--bg); color:var(--text);} 
+    header{display:flex; gap:16px; align-items:center; padding:14px 18px; background:linear-gradient(180deg,#0e1622,#0b0f14); position:sticky; top:0; z-index:10; border-bottom:1px solid #0f1a2a}
+    header h1{font-size:18px; margin:0; letter-spacing:.3px}
+    header .spacer{flex:1}
+    header .logo{height:40px}
+    .wrap{display:grid; grid-template-columns: 260px 1fr; gap:16px; padding:16px}
+    aside{background:var(--panel); border:1px solid #16243a; border-radius:14px; padding:12px; position:sticky; top:70px; height:fit-content}
+    aside h3{margin:8px 0 6px; font-size:13px; color:var(--muted); font-weight:600}
+    aside label{display:block; font-size:12px; color:var(--muted); margin:.6rem 0 .25rem}
+    aside input, aside select, aside textarea{width:100%; background:#0e1520; color:var(--text); border:1px solid #1f2c45; border-radius:10px; padding:8px 10px; font-size:13px}
+    aside textarea{min-height:140px; font-family:ui-monospace,Menlo,Consolas,monospace}
+    aside .btn{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #20324f; background:#0f1b2c; color:var(--text); cursor:pointer; font-weight:600; margin-top:8px}
+    aside .btn:hover{background:#102036}
+    main{display:grid; gap:16px}
+    .panel{background:var(--panel); border:1px solid #16243a; border-radius:14px; padding:12px}
+    .kpis{display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:12px}
+    .kpi{background:var(--soft); border:1px solid #1f2d44; border-radius:12px; padding:14px}
+    .kpi h4{margin:0 0 6px; font-size:12px; color:var(--muted)} .kpi .v{font-size:22px; font-weight:700}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    canvas{width:100%; height:320px; background:#0c141f; border:1px solid #1b2a45; border-radius:12px}
+    table{width:100%; border-collapse:collapse; font-size:13px}
+    th,td{padding:8px 10px; border-bottom:1px solid #1b2a45}
+    th{color:var(--muted); text-align:left; position:sticky; top:0; background:#0f1725}
+    .tag{font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid #274166; background:#0d1a2b; color:#b9d7f4}
+    .good{color:var(--good)} .bad{color:var(--bad)} .muted{color:var(--muted)}
+    footer{padding:14px; text-align:center; color:var(--muted)}
+    .small{font-size:12px; color:var(--muted)}
+    .flex{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .pill{border:1px solid #20324f; background:#0f1b2c; color:var(--text); border-radius:999px; padding:6px 10px; font-size:12px}
+    .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+    .notice{background:#0f1f33; border:1px dashed #25426b; padding:10px; border-radius:10px; font-size:12px; color:#c8ddff}
+    @media(max-width:1100px){.wrap{grid-template-columns:1fr}.row{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
+    footer img { height:56px; vertical-align:middle; margin-top:6px; display:block; margin-left:auto; margin-right:auto; }
+
+    header .logo {
+  height: 120px; /* ajusta conforme necessário */
+  margin-right: 15px;
+}
+
+footer #logoFooter {
+  height: 70px; /* ajusta o rodapé separadamente */
+  margin: 10px 0;
+}
+
+  </style>
+</head>
+<body>
+<header>
+  <img class="logo" id="logoHeader" src="muv.png" 
+       alt="Logotipo MUV Educação & Engenharia" 
+       onerror="this.style.display='none'" />
+  <h1>Dashboard de GEE — Emissões & CO₂e Evitado</h1>
+  <div class="spacer"></div>
+  <div class="flex">
+    <!-- mantém os botões e seletores -->
+    <span class="pill">GWP: 
+      <select id="gwpSelect" aria-label="Selecionar GWP">
+        <option value="AR6" selected>AR6 (100a)</option>
+        <option value="AR5">AR5 (100a)</option>
+      </select>
+    </span>
+    <span class="pill">Fonte EF: 
+      <select id="efSourceSelect" aria-label="Fonte de fatores (EDM/SAPP/IEA)">
+        <option value="EDM" selected>EDM</option>
+        <option value="SAPP">SAPP</option>
+        <option value="IEA">IEA</option>
+      </select>
+    </span>
+    <span class="pill">Período: 
+      <select id="periodSelect">
+        <option value="monthly" selected>Mensal</option>
+        <option value="annual">Anual</option>
+      </select>
+    </span>
+    <button class="pill" id="recalcBtn">Recalcular</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside>
+    <h3>Dados</h3>
+    <label for="fileInput">Carregar CSV (schema simples)</label>
+    <input type="file" id="fileInput" accept=".csv" />
+    <button class="btn" id="loadSample">Carregar dados de exemplo</button>
+
+    <h3>Fatores da Rede (kg CO₂e/kWh)</h3>
+    <p class="small">Editar JSON por ano e região. Fonte ativa: <b id="efSourceBadge">EDM</b>. Usado quando <code>fuel_type = grid</code> ou no baseline elétrico.</p>
+    <textarea id="gridEF"></textarea>
+    <button class="btn" id="applyEF">Aplicar fatores</button>
+
+    <h3>Filtros</h3>
+    <label>Setor</label>
+    <select id="sectorFilter"><option value="all">Todos</option><option>renovavel</option><option>agricultura</option><option>pesca</option><option>ferrovia</option><option>outros</option></select>
+    <label>País</label>
+    <input id="countryFilter" placeholder="Ex.: MZ"/>
+    <label>Ano</label>
+    <input id="yearFilter" placeholder="YYYY"/>
+    <button class="btn" id="applyFilters">Aplicar filtros</button>
+
+    <h3>Exportar</h3>
+    <button class="btn" id="exportCSV">Exportar agregados (CSV)</button>
+
+    <h3>Como usar</h3>
+    <div class="notice">
+      1) Carregue dados ou use o exemplo.<br>
+      2) Escolha GWP (AR5/AR6) e a <b>fonte de fatores</b> (EDM/SAPP/IEA).<br>
+      3) Ajuste fatores no JSON por ano e clique <b>Aplicar fatores</b>.<br>
+      4) Aplique filtros e <b>Recalcular</b>.<br>
+      5) Exporte os agregados.
+    </div>
+  </aside>
+
+  <main>
+    <section class="panel">
+      <div class="kpis">
+        <div class="kpi"><h4>Emissões totais (tCO₂e)</h4><div class="v" id="kpiTotal">—</div><div class="small" id="kpiTotalNote"></div></div>
+        <div class="kpi"><h4>CO₂e evitado (t)</h4><div class="v good" id="kpiAvoided">—</div><div class="small" id="kpiAvoidedNote"></div></div>
+        <div class="kpi"><h4>Redução vs. baseline</h4><div class="v" id="kpiReduction">—</div><div class="small" id="kpiReductionNote"></div></div>
+        <div class="kpi"><h4>Custo por tCO₂e (se fornecido)</h4><div class="v" id="kpiCost">—</div><div class="small" id="kpiCostNote"></div></div>
+      </div>
+    </section>
+
+    <section class="panel row">
+      <div>
+        <h3 class="muted">Série temporal — Emissões, Baseline, Evitado</h3>
+        <canvas id="lineChart" height="360"></canvas>
+      </div>
+      <div>
+        <h3 class="muted">Top projetos — tCO₂e evitado</h3>
+        <canvas id="barChart" height="360"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="flex" style="justify-content:space-between; align-items:center">
+        <h3 class="muted">Tabela de projetos (agregados)</h3>
+        <span class="tag" id="badgeCount">0 projetos</span>
+      </div>
+      <div style="overflow:auto; max-height:420px">
+        <table id="projTable">
+          <thead>
+            <tr>
+              <th>Projeto</th><th>Setor</th><th>País</th><th>Ano</th>
+              <th>Baseline (tCO₂e)</th><th>Projeto (tCO₂e)</th><th>Evitado (t)</th><th>Redução %</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="small">Notas metodológicas: CO₂e = CO₂ + CH₄×GWP + N₂O×GWP. Evitado = Baseline − Projeto. GWP selecionável (AR5/AR6, 100 anos). Fonte de fatores: EDM/SAPP/IEA conforme seleção.</p>
+    </section>
+
+    <section class="panel">
+      <h3 class="muted">Metodologia & Configuração</h3>
+      <div class="grid-3">
+        <div>
+          <h4>GWP</h4>
+          <ul class="small">
+            <li><b>AR5 (100a):</b> CH₄=28, N₂O=265</li>
+            <li><b>AR6 (100a):</b> CH₄=27.2, N₂O=273</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Fatores de emissão</h4>
+          <p class="small">Para <code>fuel_type = grid</code> aplica-se fator por ano e região a partir da fonte ativa (EDM, SAPP ou IEA). Outros combustíveis devem fornecer EF_CO2/CH4/N2O no dataset.</p>
+        </div>
+        <div>
+          <h4>Fórmulas</h4>
+          <ul class="small">
+            <li>Emissões_CO₂e = Activity×EF_CO2 + Activity×EF_CH4×GWP_CH4 + Activity×EF_N2O×GWP_N2O</li>
+            <li>Evitado = Baseline_CO₂e − Projeto_CO₂e</li>
+            <li>Redução_% = Evitado / Baseline × 100</li>
+            <li>Custo/tCO₂e = (CAPEX+ΣOPEX)/ΣEvitado (simplificado)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+   <footer>
+  <img id="logoFooter" src="muv.png" 
+       alt="Logotipo MUV Educação & Engenharia" 
+       onerror="this.style.display='none'"><br>
+  <b>Elaborado pela MUV Educação & Engenharia, Lda</b><br>
+  e-mails: <a href="mailto:globalmuv@muv.co.mz">globalmuv@muv.co.mz</a><br>
+  contactos: (+258) 834802943 - 878109081<br>
+  Considere projetos de ferrovia, agricultura, energias renováveis (ex.: Central Solar de Metoro 41MWp, Mocuba 41MWp em operação e outros da FUNAE em sistema off-grid).<br>
+  <span class="small">v1.1  GEE By Muv.</span>
+</footer>
+
+  </main>
+</div>
+
+<script>
+/*\
+*  Utilidades simples   *
+\*/
+const fmtTons = n => (isFinite(n)? (n>=1000? (n/1000).toFixed(2)+" kt" : n.toFixed(2)+" t") : "—");
+const pct = (a,b)=> (b>0? (a/b*100) : 0);
+const groupBy = (arr, keyFn) => arr.reduce((m,x)=>{const k=keyFn(x);(m[k]??=[]).push(x);return m;},{});
+const sum = arr => arr.reduce((a,b)=>a+(+b||0),0);
+const parseDate = s => new Date(s);
+// Polyfill para replaceAll em browsers antigos
+if(!String.prototype.replaceAll){ String.prototype.replaceAll = function(find, repl){ return this.split(find).join(repl); }; }
+// Função utilitária para dimensionar canvas com DPR
+function setupCanvas(cvs, cssH=320){ const ctx = cvs.getContext('2d'); const dpr = (window.devicePixelRatio||1); const cssW = cvs.clientWidth||600; cvs.width = Math.max(300, Math.floor(cssW*dpr)); cvs.height = Math.floor(cssH*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); return ctx; }
+
+/*\
+*  Configuração GWP     *
+\*/
+const GWP = {
+  AR5:  { CO2:1, CH4:28.0,  N2O:265 },
+  AR6:  { CO2:1, CH4:27.2,  N2O:273 }
+};
+
+/*\
+*  Estado               *
+\*/
+let state = {
+  gwp: 'AR6',
+  efSource: 'EDM', // EDM | SAPP | IEA
+  gridEFs: {
+    // kg CO2e/kWh — valores de exemplo/placeholder. Substitua pelos oficiais EDM/SAPP/IEA.
+    EDM:  {"MZ": {"2019": 0.65, "2020": 0.62, "2021": 0.58, "2022": 0.55, "2023": 0.53, "2024": 0.52}},
+    SAPP: {"SAPP": {"2019": 0.80, "2020": 0.78, "2021": 0.76, "2022": 0.74, "2023": 0.72, "2024": 0.70}},
+    IEA:  {"AFR": {"2019": 0.72, "2020": 0.70, "2021": 0.69, "2022": 0.67, "2023": 0.66, "2024": 0.65}}
+  },
+  period: 'monthly',
+  raw: [],
+  filtered: [],
+  aggByProject: [],
+  aggTime: []
+};
+
+function currentGridEF(){ return state.gridEFs[state.efSource]; }
+
+/*\
+*  Dados de EXEMPLO     *
+\*/
+const sample = {
+  rows: [
+    {project_id:'P01', project_name:'Metoro 41MWp', sector:'renovavel', country:'MZ', date:'2023-01-01', fuel_type:'grid', activity_amount:120000, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:120000, capex: 5000000, opex: 120000},
+    {project_id:'P01', project_name:'Metoro 41MWp', sector:'renovavel', country:'MZ', date:'2024-01-01', fuel_type:'grid', activity_amount:130000, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:130000, capex: 0, opex: 10000},
+
+    {project_id:'P02', project_name:'Mocuba 41MWp', sector:'renovavel', country:'MZ', date:'2023-02-01', fuel_type:'grid', activity_amount:118500, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:118500, capex: 4200000, opex: 11000},
+
+    {project_id:'P03', project_name:'FUNAE Off-grid — Mini-redes', sector:'renovavel', country:'MZ', date:'2023-03-01', fuel_type:'grid', activity_amount:38000, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:60000, capex: 800000, opex: 9000},
+
+    {project_id:'P04', project_name:'Agro Verde Nacala', sector:'agricultura', country:'MZ', date:'2023-01-01', fuel_type:'diesel', activity_amount:8000, activity_unit:'L', ef_co2:2.68, ef_ch4:0.0005, ef_n2o:0.0001, baseline_activity_amount:12000, capex: 200000, opex: 30000},
+
+    {project_id:'P05', project_name:'Pesca Eficiente Sofala', sector:'pesca', country:'MZ', date:'2023-01-01', fuel_type:'grid', activity_amount:40000, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:60000, capex: 150000, opex: 8000},
+
+    {project_id:'P06', project_name:'Ferrovia Eléctrica', sector:'ferrovia', country:'MZ', date:'2024-01-01', fuel_type:'grid', activity_amount:220000, activity_unit:'kWh', ef_co2:null, ef_ch4:null, ef_n2o:null, baseline_activity_amount:280000, capex: 3000000, opex: 90000}
+  ]
+};
+
+/*\
+*  Leitura CSV          *
+\*/
+function parseCSV(text){
+  const [header,...lines] = text.trim().split(/\r?\n/);
+  const cols = header.split(',').map(s=>s.trim());
+  return lines.map(line=>{
+    const vals = line.split(',');
+    const obj = {}; cols.forEach((c,i)=> obj[c]=vals[i]!==undefined? vals[i].trim(): '');
+    ['activity_amount','baseline_activity_amount','ef_co2','ef_ch4','ef_n2o','capex','opex','project_emissions_co2e']
+      .forEach(k=>{ if(obj[k]!=='' && obj[k]!==null && obj[k]!==undefined) obj[k]=Number(obj[k]); });
+    return obj;
+  });
+}
+
+/*\
+*  Cálculos principais  *
+\*/
+function factorForRow(row, year){
+  // retorna kg CO2e por unidade de atividade
+  if(row.fuel_type==='grid'){
+    const gridEF = currentGridEF();
+    const reg = gridEF[row.country] ? row.country : (gridEF['SAPP']? 'SAPP' : (gridEF['AFR']? 'AFR' : null));
+    const y = String(year);
+    if(reg){
+      const v = gridEF[reg][y];
+      if(v!=null) return {co2e:v, from:gridEF:${state.efSource}:${reg}:${y}};
+    }
+  }
+  if(row.ef_co2!=null || row.ef_ch4!=null || row.ef_n2o!=null){
+    const gwp = GWP[state.gwp];
+    const co2 = (row.ef_co2||0);
+    const ch4 = (row.ef_ch4||0) * gwp.CH4;
+    const n2o = (row.ef_n2o||0) * gwp.N2O;
+    return {co2e: co2 + ch4 + n2o, from:'rowEF'};
+  }
+  return {co2e:0, from:'unknown'};
+}
+
+function calcEmissions(rows){
+  const out = rows.map(r=>{
+    const d = parseDate(r.date);
+    const y = d.getUTCFullYear();
+    const ef = factorForRow(r, y); // kg CO2e / unidade
+    const activity = Number(r.activity_amount)||0; 
+    const projProvided = Number(r.project_emissions_co2e);
+    const proj = isFinite(projProvided) && projProvided>0 ? projProvided : (activity * ef.co2e / 1000); // tCO2e
+
+    const baseActivity = isFinite(r.baseline_activity_amount)? Number(r.baseline_activity_amount) : activity;
+    const base = (baseActivity * ef.co2e) / 1000; // tCO2e
+
+    const avoided = base - proj;
+    const redPct = base>0? avoided/base*100 : 0;
+
+    return {
+      ...r,
+      year: y,
+      ef_source: ef.from,
+      ef_co2e_per_unit: ef.co2e,
+      project_emissions_t: proj,
+      baseline_emissions_t: base,
+      avoided_t: avoided,
+      reduction_pct: redPct,
+      cost_total: (Number(r.capex)||0) + (Number(r.opex)||0)
+    };
+  });
+  return out;
+}
+
+function aggregate(calced){
+  const sectorSel = document.getElementById('sectorFilter').value;
+  const countrySel = document.getElementById('countryFilter').value.trim().toUpperCase();
+  const yearSel = document.getElementById('yearFilter').value.trim();
+
+  let f = calced;
+  if(sectorSel!=='all') f = f.filter(r=>r.sector===sectorSel);
+  if(countrySel) f = f.filter(r=> String(r.country||'').toUpperCase()===countrySel);
+  if(yearSel) f = f.filter(r=> String(r.year)===yearSel);
+
+  state.filtered = f;
+
+  const byProj = Object.entries(groupBy(f, r=>r.project_id)).map(([pid, arr])=>{
+    const any = arr[0]||{};
+    const baseline = sum(arr.map(x=>x.baseline_emissions_t));
+    const project = sum(arr.map(x=>x.project_emissions_t));
+    const avoided = baseline - project;
+    const redPct = baseline>0? avoided/baseline*100 : 0;
+    const years = [...new Set(arr.map(x=>x.year))].sort();
+    const cost = sum(arr.map(x=>x.cost_total));
+    return {project_id:pid, project_name:any.project_name, sector:any.sector, country:any.country, years, baseline, project, avoided, redPct, cost};
+  }).sort((a,b)=>b.avoided-a.avoided);
+  state.aggByProject = byProj;
+
+  const keyTime = state.period==='annual' ? (r=>String(r.year)) : (r=> r.date.slice(0,7));
+  const byTime = Object.entries(groupBy(f, keyTime)).map(([k, arr])=>{
+    const baseline = sum(arr.map(x=>x.baseline_emissions_t));
+    const project = sum(arr.map(x=>x.project_emissions_t));
+    const avoided = baseline - project;
+    return {period:k, baseline, project, avoided};
+  }).sort((a,b)=> a.period.localeCompare(b.period));
+  state.aggTime = byTime;
+
+  return {byProj, byTime};
+}
+
+/*\
+*  Renderização         *
+\*/
+function renderKPIs(){
+  const totalBase = sum(state.filtered.map(x=>x.baseline_emissions_t));
+  const totalProj  = sum(state.filtered.map(x=>x.project_emissions_t));
+  const avoided = totalBase - totalProj;
+  const red = totalBase>0? avoided/totalBase*100 : 0;
+
+  document.getElementById('kpiTotal').textContent = fmtTons(totalProj);
+  document.getElementById('kpiTotalNote').textContent = Baseline: ${fmtTons(totalBase)};
+  document.getElementById('kpiAvoided').textContent = fmtTons(avoided);
+  document.getElementById('kpiAvoidedNote').textContent = Soma dos projetos filtrados;
+  document.getElementById('kpiReduction').textContent = isFinite(red)? red.toFixed(1)+"%" : "—";
+  document.getElementById('kpiReductionNote').textContent = vs. baseline;
+
+  const cost = sum(state.aggByProject.map(p=>p.cost));
+  const costPerT = avoided>0? cost/avoided : NaN;
+  document.getElementById('kpiCost').textContent = isFinite(costPerT)? costPerT.toFixed(2)+' /t' : '—';
+  document.getElementById('kpiCostNote').textContent = cost? 'CAPEX+OPEX agregados' : 'Sem custos nos dados';
+}
+
+function drawLineChart(){
+  const cvs = document.getElementById('lineChart');
+  const ctx = setupCanvas(cvs, 320);
+  const W = cvs.width, H = cvs.height; ctx.clearRect(0,0,W,H);
+  const data = state.aggTime;
+  if(!data.length){ ctx.fillStyle='#9fb0c3'; ctx.fillText('Sem dados', 20, 20); return; }
+  const labels = data.map(d=>d.period);
+  const maxV = Math.max(1, ...data.map(d=>Math.max(d.baseline, d.project)));
+  const pad = 40; const innerW = cvs.clientWidth - pad*2; const innerH = 280 - pad;
+  function y(v){ return pad + innerH - (v/maxV)*innerH; }
+  function x(i){ return pad + (i/(labels.length-1||1))*innerW; }
+  ctx.strokeStyle = '#1b2a45'; ctx.lineWidth = 1; ctx.beginPath();
+  for(let i=0;i<=4;i++){ const yy = pad + (i/4)*innerH; ctx.moveTo(pad,yy); ctx.lineTo(pad+innerW,yy);} ctx.stroke();
+  function line(vals){ ctx.beginPath(); vals.forEach((v,i)=>{ const xx=x(i), yy=y(v); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);}); ctx.stroke(); }
+  ctx.lineWidth = 2.2; ctx.strokeStyle = '#9fb0c3'; line(data.map(d=>d.baseline));
+  ctx.strokeStyle = '#4cc9f0'; line(data.map(d=>d.project));
+  ctx.strokeStyle = '#2ecc71'; line(data.map(d=>d.avoided));
+  ctx.fillStyle = '#c8ddff'; ctx.font = '12px system-ui';
+  ctx.fillText('Baseline', pad, 18);
+  ctx.fillText('Projeto', pad+80, 18);
+  ctx.fillText('Evitado', pad+150, 18);
+}
+
+  const labels = data.map(d=>d.period);
+  const maxV = Math.max(1, ...data.map(d=>Math.max(d.baseline, d.project)));
+  const pad = 40; const innerW = cvs.clientWidth - pad*2; const innerH = 280 - pad;
+  function y(v){ return pad + innerH - (v/maxV)*innerH; }
+  function x(i){ return pad + (i/(labels.length-1||1))*innerW; }
+
+  ctx.strokeStyle = '#1b2a45'; ctx.lineWidth = 1; ctx.beginPath();
+  for(let i=0;i<=4;i++){ const yy = pad + (i/4)*innerH; ctx.moveTo(pad,yy); ctx.lineTo(pad+innerW,yy);} ctx.stroke();
+
+  function line(vals){ ctx.beginPath(); vals.forEach((v,i)=>{ const xx=x(i), yy=y(v); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);}); ctx.stroke(); }
+
+  ctx.lineWidth = 2.2; ctx.strokeStyle = '#9fb0c3'; line(data.map(d=>d.baseline));
+  ctx.strokeStyle = '#4cc9f0'; line(data.map(d=>d.project));
+  ctx.strokeStyle = '#2ecc71'; line(data.map(d=>d.avoided));
+
+  ctx.fillStyle = '#c8ddff'; ctx.font = '12px system-ui';
+  ctx.fillText('Baseline', pad, 18);
+  ctx.fillText('Projeto', pad+80, 18);
+  ctx.fillText('Evitado', pad+150, 18);
+}
+
+function drawBarChart(){
+  const cvs = document.getElementById('barChart');
+  const ctx = setupCanvas(cvs, 320);
+  const W = cvs.width, H = cvs.height; ctx.clearRect(0,0,W,H);
+  const data = state.aggByProject.slice(0,8);
+  if(!data.length){ ctx.fillStyle='#9fb0c3'; ctx.fillText('Sem dados', 20, 20); return; }
+  const maxV = Math.max(1, ...data.map(d=>Math.max(d.avoided,0)));
+  const pad = 40; const innerW = cvs.clientWidth - pad*2; const innerH = 280 - pad; const barW = innerW / (data.length*1.3);
+  ctx.strokeStyle = '#1b2a45'; ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, pad+innerH); ctx.lineTo(pad+innerW, pad+innerH); ctx.stroke();
+  data.forEach((d,i)=>{
+    const h = (Math.max(d.avoided,0)/maxV)*innerH;
+    const x = pad + i*barW*1.3 + 6; const y = pad+innerH-h;
+    ctx.fillStyle = '#2ecc71'; ctx.fillRect(x, y, barW, h);
+    ctx.fillStyle = '#c8ddff'; ctx.font = '11px system-ui';
+    const label = (d.project_name||d.project_id||'').slice(0,14);
+    ctx.fillText(label, x, pad+innerH+14);
+  });
+}
+
+  const maxV = Math.max(1, ...data.map(d=>Math.max(d.avoided,0)));
+  const pad = 40; const innerW = cvs.clientWidth - pad*2; const innerH = 280 - pad; const barW = innerW / (data.length*1.3);
+
+  ctx.strokeStyle = '#1b2a45'; ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, pad+innerH); ctx.lineTo(pad+innerW, pad+innerH); ctx.stroke();
+
+  data.forEach((d,i)=>{
+    const h = (Math.max(d.avoided,0)/maxV)*innerH;
+    const x = pad + i*barW*1.3 + 6; const y = pad+innerH-h;
+    ctx.fillStyle = '#2ecc71'; ctx.fillRect(x, y, barW, h);
+    ctx.fillStyle = '#c8ddff'; ctx.font = '11px system-ui';
+    const label = (d.project_name||d.project_id||'').slice(0,14);
+    ctx.fillText(label, x, pad+innerH+14);
+  });
+}
+
+function renderTable(){
+  const tb = document.querySelector('#projTable tbody'); tb.innerHTML='';
+  state.aggByProject.forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.project_name||p.project_id}</td>
+      <td>${p.sector}</td>
+      <td>${p.country}</td>
+      <td>${p.years.join(', ')}</td>
+      <td>${p.baseline.toFixed(2)}</td>
+      <td>${p.project.toFixed(2)}</td>
+      <td class="${p.avoided>=0?'good':'bad'}">${p.avoided.toFixed(2)}</td>
+      <td>${isFinite(p.redPct)? p.redPct.toFixed(1)+'%' : '—'}</td>
+    `;
+    tb.appendChild(tr);
+  });
+  document.getElementById('badgeCount').textContent = ${state.aggByProject.length} projetos;
+}
+
+function recalc(){
+  state.gwp = document.getElementById('gwpSelect').value;
+  state.period = document.getElementById('periodSelect').value;
+  const calced = calcEmissions(state.raw);
+  aggregate(calced);
+  renderKPIs();
+  drawLineChart();
+  drawBarChart();
+  renderTable();
+}
+function safeRecalc(){
+  try{ recalc(); }
+  catch(err){ console.error(err); alert('Erro ao executar os cálculos. Verifique o CSV/JSON e tente novamente.'); }
+}
+
+/*\
+*  Exportação CSV       *
+\*/
+function exportAggregates(){
+  const rows = [['project_id','project_name','sector','country','years','baseline_t','project_t','avoided_t','reduction_pct','cost_total']];
+  state.aggByProject.forEach(p=>{
+    rows.push([p.project_id,p.project_name,p.sector,p.country,p.years.join('|'),p.baseline.toFixed(3),p.project.toFixed(3),p.avoided.toFixed(3),p.redPct.toFixed(2),p.cost.toFixed(2)]);
+  });
+  const csv = rows.map(r=>r.map(v=>"${String(v).replaceAll('"','""')}").join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='aggregados_projetos.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+/*\
+*  Eventos UI           *
+\*/
+function initEFTextarea(){
+  const ta = document.getElementById('gridEF');
+  ta.value = JSON.stringify(currentGridEF(), null, 2);
+  document.getElementById('efSourceBadge').textContent = state.efSource;
+}
+
+function applyEF(){
+  try{ const json = JSON.parse(document.getElementById('gridEF').value); state.gridEFs[state.efSource] = json; recalc(); }
+  catch(e){ alert('JSON inválido nos fatores da rede.'); }
+}
+
+function loadSample(){ state.raw = sample.rows; recalc(); }
+
+function onFileChange(e){
+  const f = e.target.files[0]; if(!f) return;
+  const ext = f.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    const reader = new FileReader(); reader.onload = ()=>{ state.raw = parseCSV(reader.result); recalc(); }; reader.readAsText(f);
+  } else {
+    alert('Para já, importe CSV. (XLSX: exporte para CSV).');
+  }
+}
+
+function applyFilters(){ recalc(); }
+
+/*\
+*  Boot                 *
+\*/
+window.addEventListener('DOMContentLoaded',()=>{
+  initEFTextarea();
+  document.getElementById('recalcBtn').addEventListener('click', ()=>safeRecalc());
+  document.getElementById('loadSample').addEventListener('click', ()=>{ state.raw = sample.rows; safeRecalc(); });
+  document.getElementById('fileInput').addEventListener('change', onFileChange);
+  document.getElementById('applyEF').addEventListener('click', applyEF);
+  document.getElementById('applyFilters').addEventListener('click', applyFilters);
+  document.getElementById('exportCSV').addEventListener('click', exportAggregates);
+  document.getElementById('efSourceSelect').addEventListener('change', (e)=>{ state.efSource = e.target.value; initEFTextarea(); safeRecalc(); });
+  // primeira renderização
+  state.raw = sample.rows; safeRecalc();
+  // redimensionamento responsivo
+  let t=null; window.addEventListener('resize', ()=>{ clearTimeout(t); t=setTimeout(()=>safeRecalc(), 150); });
+});
+  document.getElementById('recalcBtn').addEventListener('click', recalc);
+  document.getElementById('loadSample').addEventListener('click', loadSample);
+  document.getElementById('fileInput').addEventListener('change', onFileChange);
+  document.getElementById('applyEF').addEventListener('click', applyEF);
+  document.getElementById('applyFilters').addEventListener('click', applyFilters);
+  document.getElementById('exportCSV').addEventListener('click', exportAggregates);
+  document.getElementById('efSourceSelect').addEventListener('change', (e)=>{ state.efSource = e.target.value; initEFTextarea(); recalc(); });
+
+  loadSample();
+});
+</script>
+</body>
+</html>
