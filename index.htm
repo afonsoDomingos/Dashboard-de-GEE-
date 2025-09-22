@@ -8,6 +8,138 @@
     :root{
       --bg:#0b0f14; --panel:#111823; --soft:#162132; --text:#e6edf3; --muted:#9fb0c3; --accent:#4cc9f0; --good:#2ecc71; --bad:#e74c3c; --warn:#f1c40f;
     }
+
+
+
+.kpi .good, .kpi .v.good {
+  color: var(--good);
+  text-shadow: 0 0 4px #2ecc7155;
+}
+.kpi .v {
+  color: var(--text);
+}
+.kpi .v.bad {
+  color: var(--bad);
+}
+header {
+  box-shadow: 0 2px 8px #2ecc7122;
+  border-bottom: 2px solid var(--good);
+}
+aside .btn:hover, .pill:hover {
+  background: #163c2e;
+  color: var(--good);
+  border-color: var(--good);
+}
+td.good {
+  background: #163c2e;
+  color: var(--good);
+  font-weight: bold;
+}
+td.bad {
+  background: #2e1616;
+  color: var(--bad);
+  font-weight: bold;
+}
+
+
+.btn#recalcBtn, .btn#exportCSV {
+  background: var(--good);
+  color: #fff;
+  border-color: var(--good);
+  box-shadow: 0 2px 8px #2ecc7133;
+}
+.btn#recalcBtn:hover, .btn#exportCSV:hover {
+  background: #27ae60;
+  color: #fff;
+}
+
+.pill:focus-within, .pill:active, .pill.selected {
+  border-color: var(--good);
+  box-shadow: 0 0 0 2px #2ecc7133;
+}
+
+select:focus, select:active {
+  border-color: var(--good);
+  outline: 1px solid #2ecc71;
+}
+
+.notice, .panel .notice {
+  border: 1.5px dashed var(--good);
+  background: #163c2e;
+  color: #e6fbe6;
+}
+
+td.good {
+  background: #163c2e;
+  color: var(--good);
+  font-weight: bold;
+}
+td.bad {
+  background: #2e1616;
+  color: var(--bad);
+  font-weight: bold;
+}
+td {
+  transition: background 0.2s;
+}
+td.reduction-positive {
+  background: #163c2e;
+  color: var(--good);
+  font-weight: bold;
+}
+
+
+
+/* ...existing code... */
+
+/* Título principal com sombra verde */
+header h1 {
+  text-shadow: 0 0 8px #2ecc7155;
+}
+
+/* Seletores ativos com verde */
+select:focus, select:active {
+  border-color: var(--good);
+  outline: 2px solid #2ecc71;
+}
+
+/* Badge de projetos destacado */
+#badgeCount {
+  background: var(--good);
+  color: #fff;
+  border: 1px solid #27ae60;
+  box-shadow: 0 0 8px #2ecc7133;
+}
+
+/* Rodapé com borda verde */
+footer {
+  border-top: 2px solid var(--good);
+}
+
+/* KPI de redução positivo em verde */
+#kpiReduction {
+  transition: color 0.2s;
+}
+#kpiReduction.good {
+  color: var(--good);
+  text-shadow: 0 0 4px #2ecc7155;
+}
+
+/* Botões principais com sombra verde ao focar */
+.btn:focus, .btn:active {
+  box-shadow: 0 0 0 2px #2ecc7133;
+  border-color: var(--good);
+}
+
+/* Pills selecionadas com verde */
+.pill.selected, .pill:focus-within {
+  border-color: var(--good);
+  box-shadow: 0 0 0 2px #2ecc7133;
+}
+
+/* ...existing code... */
+
+
     *{box-sizing:border-box}
     body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:var(--bg); color:var(--text);} 
     header{display:flex; gap:16px; align-items:center; padding:14px 18px; background:linear-gradient(180deg,#0e1622,#0b0f14); position:sticky; top:0; z-index:10; border-bottom:1px solid #0f1a2a}
